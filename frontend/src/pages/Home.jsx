@@ -2,30 +2,19 @@ import { useEffect, useState } from "react";
 import { getImageUrl } from "../utils/image";
 import { Link } from "react-router-dom";
 
-const popularBrands = [
-  { id: 1, name: "Nike" },
-  { id: 2, name: "Adidas" },
-  { id: 3, name: "Jordan" },
-  { id: 4, name: "Under Armour" },
-  { id: 5, name: "Anta" },
-  { id: 6, name: "Converse" },
-  { id: 7, name: "New Balance" },
-  { id: 8, name: "Puma" }
-];
-
 export default function Home() {
   const [showAlert, setShowAlert] = useState(false);
 
-  // Temporary frontend data based on your current project assets
+  // Make this match Shop.jsx exactly
   const brands = [
     { id: 1, name: "Nike", image: "/images/nike.svg" },
     { id: 2, name: "Adidas", image: "/images/adidas.svg" },
     { id: 3, name: "Jordan", image: "/images/jordan.svg" },
-    { id: 4, name: "Puma", image: "/images/puma.svg" },
+    { id: 4, name: "Under Armour", image: "/images/under armour.svg" },
     { id: 5, name: "Anta", image: "/images/anta.svg" },
     { id: 6, name: "Converse", image: "/images/converse.svg" },
     { id: 7, name: "New Balance", image: "/images/new balance.svg" },
-    { id: 8, name: "Under Armour", image: "/images/under armour.svg" }
+    { id: 8, name: "Puma", image: "/images/puma.svg" }
   ];
 
   const featuredProducts = [];
