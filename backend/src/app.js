@@ -18,7 +18,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: process.env.CLIENT_URL?.replace(/\/$/, ""),
     credentials: true
   })
 );
