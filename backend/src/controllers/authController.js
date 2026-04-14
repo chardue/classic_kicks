@@ -100,6 +100,8 @@ export async function logoutUser(req, res) {
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
   });
+
+  return res.json({ message: "Logged out successfully" });
 }
 
 export async function getCurrentUser(req, res) {
