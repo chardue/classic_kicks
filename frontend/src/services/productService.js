@@ -21,20 +21,6 @@ export async function fetchProducts(filters = {}) {
   return data;
 }
 
-export async function fetchProductById(id) {
-  const response = await fetch(`${API_BASE_URL}/products/${id}`, {
-    credentials: "include"
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Failed to fetch product");
-  }
-
-  return data;
-}
-
 export async function searchProducts(query) {
   const response = await fetch(
     `${API_BASE_URL}/products/search?q=${encodeURIComponent(query)}`,
@@ -47,6 +33,20 @@ export async function searchProducts(query) {
 
   if (!response.ok) {
     throw new Error(data.message || "Failed to search products");
+  }
+
+  return data;
+}
+
+export async function fetchProductById(id) {
+  const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+    credentials: "include"
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to fetch product");
   }
 
   return data;

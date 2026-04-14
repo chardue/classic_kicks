@@ -1,28 +1,38 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { fetchOrderTimeline } from "../services/orderService";
 
 export default function OrderTracking() {
-  const [orderId] = useState(101);
+  const [searchParams] = useSearchParams();
+  const orderId = searchParams.get("order_id");
 
-  // Temporary frontend data until backend API is connected
-  const [timeline] = useState([
-    {
-      status: "Order Placed",
-      message: "Your order has been placed successfully.",
-      created_at: "2026-04-10T09:30:00"
-    },
-    {
-      status: "Packed",
-      message: "Your items have been packed and prepared for shipment.",
-      created_at: "2026-04-10T01:15:00"
-    },
-    {
-      status: "Shipped",
-      message: "Your order is now on the way.",
-      created_at: "2026-04-11T08:45:00"
-    }
-  ]);
+  const [timeline, setTimeline] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const steps = ["Order Placed", "Packed", "Shipped", "Delivered"];
+
+  useEffect(() => {
+    async function loadTimeline() {
+      try {
+        setLoading(true);
+        setError("");
+
+        if (!orderId) {
+          throw new Error("Missing order id");
+        }
+
+        const data = await fetchOrderTimeline(orderId);
+        setTimeline(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadTimeline();
+  }, [orderId]);
 
   const activeStatuses = useMemo(() => {
     return timeline.map((item) => item.status);
@@ -78,7 +88,6 @@ export default function OrderTracking() {
         }
 
         .progressbar {
-          counter-reset: step;
           display: flex;
           justify-content: space-between;
           position: relative;
@@ -88,10 +97,9 @@ export default function OrderTracking() {
         .progressbar::before {
           content: "";
           position: absolute;
-          top: 50%;
+          top: 20px;
           left: 50px;
           right: 50px;
-          transform: translateY(-50%);
           height: 5px;
           background: #dcdcdc;
           z-index: 0;
@@ -105,8 +113,6 @@ export default function OrderTracking() {
         }
 
         .step::before {
-          counter-increment: step;
-          content: counter(step);
           width: 40px;
           height: 40px;
           line-height: 40px;
@@ -116,12 +122,11 @@ export default function OrderTracking() {
           margin: 0 auto 10px;
           font-weight: bold;
           color: #555;
-          transition: 0.3s;
+          content: "";
         }
 
         .step.active::before {
           background: #28a745;
-          color: #fff;
         }
 
         .step.active p {
@@ -198,7 +203,11 @@ export default function OrderTracking() {
       <div className="tracking-wrapper">
         <h2 className="tracking-title">Order Tracking #{orderId}</h2>
 
-        {timeline.length > 0 ? (
+        {loading ? (
+          <p style={{ textAlign: "center" }}>Loading tracking...</p>
+        ) : error ? (
+          <p style={{ textAlign: "center", color: "red" }}>{error}</p>
+        ) : timeline.length > 0 ? (
           <>
             <div className="progressbar">
               {steps.map((step) => {

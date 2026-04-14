@@ -3,6 +3,9 @@ import { useSearchParams } from "react-router-dom";
 import { fetchProductById } from "../services/productService";
 import { addToCart } from "../services/cartService";
 import { addToWishlist } from "../services/wishlistService";
+import { getImageUrl } from "../utils/image";
+import PageLoader from "../components/PageLoader";
+import PageError from "../components/PageError";
 
 export default function Product() {
   const [searchParams] = useSearchParams();
@@ -165,13 +168,9 @@ export default function Product() {
     );
   };
 
-  if (loading) {
-    return <div className="container mt-5"><p>Loading product...</p></div>;
-  }
+  if (loading) return <PageLoader text="Loading product..." />;
 
-  if (error) {
-    return <div className="container mt-5"><p className="text-danger">{error}</p></div>;
-  }
+  if (error) return <PageError message={error} />;
 
   if (!product) {
     return <div className="container mt-5"><p className="text-danger">Product not found.</p></div>;
@@ -252,7 +251,7 @@ export default function Product() {
         <div className="row g-4">
           <div className="col-md-6">
             <img
-              src={product.image}
+              src={getImageUrl(product.image)}
               className="img-fluid rounded shadow"
               alt={product.name}
             />

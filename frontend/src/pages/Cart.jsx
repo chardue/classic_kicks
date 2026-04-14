@@ -4,6 +4,7 @@ import {
   updateCartItemQuantity,
   deleteCartItem
 } from "../services/cartService";
+import { getImageUrl } from "../utils/image";
 
 export default function Cart() {
   const [message, setMessage] = useState("");
@@ -169,7 +170,7 @@ export default function Cart() {
                     </td>
 
                     <td>
-                      <img src={item.image} width="80" alt={item.name} />
+                      <img src={getImageUrl(item.image)} width="80" alt={item.name} />
                     </td>
 
                     <td>

@@ -1,4 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  fetchAdmins,
+  createAdminUser,
+  deleteAdminUser
+} from "../services/adminService";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function CreateAdmin() {
   const [adminUser] = useState({
@@ -7,19 +14,8 @@ export default function CreateAdmin() {
 
   const [message, setMessage] = useState("");
   const [messageClass, setMessageClass] = useState("alert-info");
-
-  const [admins, setAdmins] = useState([
-    {
-      id: 1,
-      username: "mainadmin",
-      email: "mainadmin@gmail.com"
-    },
-    {
-      id: 2,
-      username: "stockmanager",
-      email: "stockmanager@gmail.com"
-    }
-  ]);
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -27,11 +23,37 @@ export default function CreateAdmin() {
     password: ""
   });
 
-  const handleLogout = () => {
-    console.log("Admin logout");
-    setMessage("Logout clicked.");
-    setMessageClass("alert-info");
+  useEffect(() => {
+    async function loadAdmins() {
+      try {
+        setLoading(true);
+        const data = await fetchAdmins();
+        setAdmins(data);
+      } catch (error) {
+        setMessage(error.message);
+        setMessageClass("alert-danger");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadAdmins();
+  }, []);
+
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error.message);
+    }
   };
+
+  const adminNavClass = ({ isActive }) =>
+  `btn btn-sm me-2 ${isActive ? "btn-light text-dark" : "btn-outline-light"}`;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -41,54 +63,42 @@ export default function CreateAdmin() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const emailExists = admins.some(
-      (admin) => admin.email.toLowerCase() === formData.email.toLowerCase()
-    );
+    try {
+      const data = await createAdminUser(formData);
+      const refreshed = await fetchAdmins();
 
-    const usernameExists = admins.some(
-      (admin) => admin.username.toLowerCase() === formData.username.toLowerCase()
-    );
-
-    if (emailExists) {
-      setMessage("Email already exists.");
+      setAdmins(refreshed);
+      setFormData({
+        email: "",
+        username: "",
+        password: ""
+      });
+      setMessage(data.message || "Admin account created successfully.");
+      setMessageClass("alert-success");
+    } catch (error) {
+      setMessage(error.message);
       setMessageClass("alert-danger");
-      return;
     }
-
-    if (usernameExists) {
-      setMessage("Username already exists.");
-      setMessageClass("alert-danger");
-      return;
-    }
-
-    const newAdmin = {
-      id: Date.now(),
-      email: formData.email,
-      username: formData.username
-    };
-
-    setAdmins((prev) => [newAdmin, ...prev]);
-    setFormData({
-      email: "",
-      username: "",
-      password: ""
-    });
-    setMessage("Admin account created successfully.");
-    setMessageClass("alert-success");
   };
 
-  const handleDeleteAdmin = (id) => {
+  const handleDeleteAdminAccount = async (id) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this admin account?"
     );
     if (!confirmed) return;
 
-    setAdmins((prev) => prev.filter((admin) => admin.id !== id));
-    setMessage("Admin account deleted successfully.");
-    setMessageClass("alert-success");
+    try {
+      const data = await deleteAdminUser(id);
+      setAdmins((prev) => prev.filter((admin) => admin.id !== id));
+      setMessage(data.message || "Admin account deleted successfully.");
+      setMessageClass("alert-success");
+    } catch (error) {
+      setMessage(error.message);
+      setMessageClass("alert-danger");
+    }
   };
 
   return (
@@ -97,24 +107,21 @@ export default function CreateAdmin() {
         <div className="d-flex align-items-center">
           <h4 className="mb-0 text-white me-4">Admin Panel</h4>
 
-          <a href="/admindash" className="btn btn-sm btn-outline-light me-2">
+          <NavLink to="/admindash" className={adminNavClass}>
             Dashboard
-          </a>
+          </NavLink>
 
-          <a href="/admin" className="btn btn-sm btn-outline-light me-2">
+          <NavLink to="/admin" className={adminNavClass}>
             Manage Products
-          </a>
+          </NavLink>
 
-          <a
-            href="/createadmin"
-            className="btn btn-sm btn-outline-light active"
-          >
+          <NavLink to="/createadmin" className={adminNavClass}>
             Manage Admins
-          </a>
+          </NavLink>
         </div>
 
         <div className="d-flex align-items-center">
-          <span className="me-3 text-white">Welcome, {adminUser.username}</span>
+          <span className="me-3 text-white">Welcome, {user?.username || "admin"}</span>
           <button
             type="button"
             className="btn btn-outline-light btn-sm text-decoration-none"
@@ -142,12 +149,9 @@ export default function CreateAdmin() {
 
                 <form onSubmit={handleSubmit}>
                   <div className="mb-3">
-                    <label htmlFor="email" className="form-label">
-                      Email
-                    </label>
+                    <label className="form-label">Email</label>
                     <input
                       type="email"
-                      id="email"
                       name="email"
                       className="form-control"
                       value={formData.email}
@@ -157,12 +161,9 @@ export default function CreateAdmin() {
                   </div>
 
                   <div className="mb-3">
-                    <label htmlFor="username" className="form-label">
-                      Username
-                    </label>
+                    <label className="form-label">Username</label>
                     <input
                       type="text"
-                      id="username"
                       name="username"
                       className="form-control"
                       value={formData.username}
@@ -172,12 +173,9 @@ export default function CreateAdmin() {
                   </div>
 
                   <div className="mb-3">
-                    <label htmlFor="password" className="form-label">
-                      Password
-                    </label>
+                    <label className="form-label">Password</label>
                     <input
                       type="password"
-                      id="password"
                       name="password"
                       className="form-control"
                       value={formData.password}
@@ -199,7 +197,9 @@ export default function CreateAdmin() {
               <div className="card-body">
                 <h5 className="fw-bold mb-3">Admin List</h5>
 
-                {admins.length > 0 ? (
+                {loading ? (
+                  <p className="text-muted mb-0">Loading admin accounts...</p>
+                ) : admins.length > 0 ? (
                   <div className="table-responsive">
                     <table className="table table-bordered align-middle">
                       <thead className="table-dark">
@@ -207,6 +207,7 @@ export default function CreateAdmin() {
                           <th>ID</th>
                           <th>Email</th>
                           <th>Username</th>
+                          <th>Role</th>
                           <th>Action</th>
                         </tr>
                       </thead>
@@ -217,11 +218,12 @@ export default function CreateAdmin() {
                             <td>{admin.id}</td>
                             <td>{admin.email}</td>
                             <td>{admin.username}</td>
+                            <td>{admin.role}</td>
                             <td>
                               <button
                                 type="button"
                                 className="btn btn-sm btn-danger"
-                                onClick={() => handleDeleteAdmin(admin.id)}
+                                onClick={() => handleDeleteAdminAccount(admin.id)}
                               >
                                 Delete
                               </button>

@@ -1,66 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { fetchAccount } from "../services/accountService";
+import { fetchAddresses } from "../services/addressService";
+import { fetchCart } from "../services/cartService";
+import { placeOrder } from "../services/orderService";
+import PageLoader from "../components/PageLoader";
 
 export default function Checkout() {
-  const [checkoutErrors] = useState([]);
+  const navigate = useNavigate();
 
-  // Temporary frontend data until backend API is connected
-  const [userDetails] = useState({
-    email: "sampleuser@gmail.com",
-    first_name: "John",
-    last_name: "Doe",
-    phone: "09123456789"
-  });
-
-  const [addresses] = useState([
-    {
-      address_id: 1,
-      house_street: "123 Shoe Street",
-      barangay: "Barangay 123",
-      city: "Manila",
-      province: "Metro Manila",
-      region: "NCR",
-      postal_code: "1000",
-      country: "Philippines"
-    },
-    {
-      address_id: 2,
-      house_street: "45 Sneaker Ave",
-      barangay: "Barangay 456",
-      city: "Quezon City",
-      province: "Metro Manila",
-      region: "NCR",
-      postal_code: "1100",
-      country: "Philippines"
-    }
-  ]);
-
-  const [cartItems] = useState([
-    {
-      cart_item_id: 1,
-      product_id: 1,
-      name: "Nike Air Force 1",
-      price: 5495,
-      image: "/images/products/AF1.webp",
-      quantity: 2,
-      sizes: "M"
-    },
-    {
-      cart_item_id: 2,
-      product_id: 2,
-      name: "Adidas Samba OG",
-      price: 6800,
-      image: "/images/products/AdidasSambaOG.webp",
-      quantity: 1,
-      sizes: "S"
-    }
-  ]);
+  const [checkoutErrors, setCheckoutErrors] = useState([]);
+  const [addresses, setAddresses] = useState([]);
+  const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     delivery_type: "delivery",
-    email: userDetails.email || "",
-    phone: userDetails.phone || "",
-    first_name: userDetails.first_name || "",
-    last_name: userDetails.last_name || "",
+    email: "",
+    phone: "",
+    first_name: "",
+    last_name: "",
     address_id: "",
     shipping: "",
     payment_method: "GCASH"
@@ -68,8 +28,45 @@ export default function Checkout() {
 
   const [selectedShipping, setSelectedShipping] = useState("free");
 
+  useEffect(() => {
+    async function loadCheckoutData() {
+      try {
+        setLoading(true);
+        setCheckoutErrors([]);
+
+        const [accountData, addressData, cartData] = await Promise.all([
+          fetchAccount(),
+          fetchAddresses(),
+          fetchCart()
+        ]);
+
+        const user = accountData.user || {};
+        const customer = accountData.customer || {};
+
+        setFormData((prev) => ({
+          ...prev,
+          email: customer.email || user.email || "",
+          phone: customer.phone || "",
+          first_name: customer.first_name || "",
+          last_name: customer.last_name || "",
+          address_id:
+            addressData.find((addr) => Number(addr.is_default) === 1)?.address_id || ""
+        }));
+
+        setAddresses(addressData);
+        setCartItems(cartData);
+      } catch (err) {
+        setCheckoutErrors([err.message]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadCheckoutData();
+  }, []);
+
   const subtotal = useMemo(() => {
-    return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+    return cartItems.reduce((total, item) => total + Number(item.price) * Number(item.quantity), 0);
   }, [cartItems]);
 
   const formatDate = (date) => {
@@ -141,12 +138,26 @@ export default function Checkout() {
     setSelectedShipping(key);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log("Checkout submitted:", formData);
-    console.log("Cart items:", cartItems);
+    try {
+      setSubmitting(true);
+      setCheckoutErrors([]);
+
+      const data = await placeOrder(formData);
+
+      navigate("/thanks", {
+        state: { orderId: data.order_id }
+      });
+    } catch (err) {
+      setCheckoutErrors([err.message]);
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) return <PageLoader text="Loading product..." />;
 
   return (
     <div className="container my-5">
@@ -331,6 +342,7 @@ export default function Checkout() {
               className="btn btn-dark btn-lg mt-3"
               data-bs-toggle="modal"
               data-bs-target="#confirmOrderModal"
+              disabled={cartItems.length === 0}
             >
               Place Order
             </button>
@@ -368,8 +380,8 @@ export default function Checkout() {
                     >
                       Review Again
                     </button>
-                    <button type="submit" className="btn btn-success">
-                      Yes, Place Order
+                    <button type="submit" className="btn btn-success" disabled={submitting}>
+                      {submitting ? "Placing..." : "Yes, Place Order"}
                     </button>
                   </div>
                 </div>
@@ -419,7 +431,7 @@ export default function Checkout() {
                     <hr />
                     <div className="d-flex justify-content-between">
                       <span>Subtotal</span>
-                      <span id="subtotal">
+                      <span>
                         ₱
                         {Number(subtotal).toLocaleString(undefined, {
                           minimumFractionDigits: 2
@@ -429,14 +441,14 @@ export default function Checkout() {
 
                     <div className="d-flex justify-content-between">
                       <span>Delivery</span>
-                      <span id="delivery-fee">{currentShipping.feeText}</span>
+                      <span>{currentShipping.feeText}</span>
                     </div>
 
                     <hr />
 
                     <div className="d-flex justify-content-between fw-bold">
                       <span>Total</span>
-                      <span id="total">
+                      <span>
                         ₱
                         {Number(total).toLocaleString(undefined, {
                           minimumFractionDigits: 2
@@ -444,7 +456,7 @@ export default function Checkout() {
                       </span>
                     </div>
 
-                    <p className="text-muted mt-2" id="arrival-date">
+                    <p className="text-muted mt-2">
                       Arrives {currentShipping.arrival}
                     </p>
                   </>

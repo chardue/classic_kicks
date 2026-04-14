@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
   const { isLoggedIn, user, logout, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
 
   const handleLogout = async () => {
     try {
@@ -12,6 +14,18 @@ export default function Navbar() {
     } catch (error) {
       console.error("Logout failed:", error.message);
     }
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const trimmed = searchTerm.trim();
+
+    if (!trimmed) {
+      navigate("/shop");
+      return;
+    }
+
+    navigate(`/shop?q=${encodeURIComponent(trimmed)}`);
   };
 
   return (
@@ -36,56 +50,34 @@ export default function Navbar() {
         <div className="collapse navbar-collapse" id="navbarContent">
           <ul className="navbar-nav me-auto mb-2 mb-lg-0">
             <li className="nav-item">
-              <NavLink
-                to="/"
-                end
-                className={({ isActive }) =>
-                  `nav-link${isActive ? " active" : ""}`
-                }
-              >
+              <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
                 Home
               </NavLink>
             </li>
-
             <li className="nav-item">
-              <NavLink
-                to="/shop"
-                className={({ isActive }) =>
-                  `nav-link${isActive ? " active" : ""}`
-                }
-              >
+              <NavLink to="/shop" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
                 Shop
               </NavLink>
             </li>
-
             <li className="nav-item">
-              <NavLink
-                to="/about"
-                className={({ isActive }) =>
-                  `nav-link${isActive ? " active" : ""}`
-                }
-              >
+              <NavLink to="/about" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
                 About
               </NavLink>
             </li>
-
             <li className="nav-item">
-              <NavLink
-                to="/contact"
-                className={({ isActive }) =>
-                  `nav-link${isActive ? " active" : ""}`
-                }
-              >
+              <NavLink to="/contact" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
                 Contact
               </NavLink>
             </li>
           </ul>
 
-          <form className="d-flex me-3">
+          <form className="d-flex me-3" onSubmit={handleSearchSubmit}>
             <input
               className="form-control me-2"
               type="search"
               placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
             <button className="btn btn-outline-dark" type="submit">
               Search
@@ -93,43 +85,22 @@ export default function Navbar() {
           </form>
 
           <div className="d-flex align-items-center gap-3">
-            <Link to="/wishlist" className="btn btn-outline-dark btn-sm">
-              ❤️
-            </Link>
-
-            <Link to="/cart" className="btn btn-outline-dark btn-sm">
-              🛒
-            </Link>
-                
-            {/* <Link to="/wishlist" className="btn btn-outline-dark btn-sm">
-              ❤️
-            </Link>
-
-            <Link to="/cart" className="btn btn-outline-dark btn-sm">
-              🛒
-            </Link>  */}
+            <Link to="/wishlist" className="btn btn-outline-dark btn-sm">❤️</Link>
+            <Link to="/cart" className="btn btn-outline-dark btn-sm">🛒</Link>
 
             {loading ? (
               <span className="text-muted small">Loading...</span>
             ) : !isLoggedIn ? (
               <>
-                <Link to="/login" className="btn btn-outline-dark btn-sm">
-                  Login
-                </Link>
-                <Link to="/register" className="btn btn-dark btn-sm">
-                  Register
-                </Link>
+                <Link to="/login" className="btn btn-outline-dark btn-sm">Login</Link>
+                <Link to="/register" className="btn btn-dark btn-sm">Register</Link>
               </>
             ) : (
               <>
                 <Link to="/my-account" className="btn btn-outline-dark btn-sm">
                   {user?.username || "My Account"}
                 </Link>
-                <button
-                  onClick={handleLogout}
-                  className="btn btn-danger btn-sm"
-                  type="button"
-                >
+                <button onClick={handleLogout} className="btn btn-danger btn-sm" type="button">
                   Logout
                 </button>
               </>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -164,13 +165,13 @@ export default function Login() {
       <div className="login-page">
         <div className="login-container">
           <div className="logo-wrapper">
-            <a href="/">
+            <Link to="/">
               <img
                 src="/images/logowithbg.png"
                 alt="Logo"
                 className="logo-image"
               />
-            </a>
+            </Link>
           </div>
 
           <h2 className="login-title">Login</h2>
@@ -228,9 +229,9 @@ export default function Login() {
 
           <p className="login-footer-text">
             Don't have an account?{" "}
-            <a href="/register" className="login-link" accessKey="R">
+            <Link to="/register" className="login-link" accessKey="R">
               <span style={{ textDecoration: "underline" }}>R</span>egister here
-            </a>
+            </Link>
           </p>
         </div>
       </div>

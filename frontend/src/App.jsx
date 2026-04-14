@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 import Home from "./pages/Home";
 import About from "./pages/About";
@@ -29,19 +30,10 @@ function PublicLayout({ children }) {
   );
 }
 
-function AuthLayout({ children }) {
-  return <>{children}</>;
-}
-
-function AdminLayout({ children }) {
-  return <>{children}</>;
-}
-
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public store pages */}
         <Route
           path="/"
           element={
@@ -82,100 +74,110 @@ export default function App() {
             </PublicLayout>
           }
         />
+
         <Route
           path="/wishlist"
           element={
-            <PublicLayout>
-              <Wishlist />
-            </PublicLayout>
+            <ProtectedRoute>
+              <PublicLayout>
+                <Wishlist />
+              </PublicLayout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/cart"
           element={
-            <PublicLayout>
-              <Cart />
-            </PublicLayout>
+            <ProtectedRoute>
+              <PublicLayout>
+                <Cart />
+              </PublicLayout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/checkout"
           element={
-            <PublicLayout>
-              <Checkout />
-            </PublicLayout>
+            <ProtectedRoute>
+              <PublicLayout>
+                <Checkout />
+              </PublicLayout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/thanks"
           element={
-            <PublicLayout>
-              <Thanks />
-            </PublicLayout>
+            <ProtectedRoute>
+              <PublicLayout>
+                <Thanks />
+              </PublicLayout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/my-account"
           element={
-            <PublicLayout>
-              <MyAccount />
-            </PublicLayout>
+            <ProtectedRoute>
+              <PublicLayout>
+                <MyAccount />
+              </PublicLayout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/order-tracking"
           element={
-            <PublicLayout>
-              <OrderTracking />
-            </PublicLayout>
+            <ProtectedRoute>
+              <PublicLayout>
+                <OrderTracking />
+              </PublicLayout>
+            </ProtectedRoute>
           }
         />
 
-        {/* Auth pages */}
         <Route
           path="/login"
           element={
-            <AuthLayout>
+            <ProtectedRoute guestOnly>
               <Login />
-            </AuthLayout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/register"
           element={
-            <AuthLayout>
+            <ProtectedRoute guestOnly>
               <Register />
-            </AuthLayout>
+            </ProtectedRoute>
           }
         />
 
-        {/* Admin pages */}
         <Route
           path="/admin"
           element={
-            <AdminLayout>
+            <ProtectedRoute requireAdmin>
               <Admin />
-            </AdminLayout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/admindash"
           element={
-            <AdminLayout>
+            <ProtectedRoute requireAdmin>
               <AdminDash />
-            </AdminLayout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/createadmin"
           element={
-            <AdminLayout>
+            <ProtectedRoute requireAdmin>
               <CreateAdmin />
-            </AdminLayout>
+            </ProtectedRoute>
           }
         />
 
-        {/* Fallback route */}
         <Route
           path="*"
           element={

@@ -1,22 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchProducts } from "../services/productService";
+import { Link, useSearchParams } from "react-router-dom";
+import { fetchProducts, searchProducts } from "../services/productService";
+import { getImageUrl } from "../utils/image";
 
 export default function Shop() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get("q") || "";
+
   const [brands] = useState([
     { id: 1, name: "Nike" },
     { id: 2, name: "Adidas" },
     { id: 3, name: "Jordan" },
-    { id: 4, name: "Puma" },
+    { id: 4, name: "Under Armour" },
     { id: 5, name: "Anta" },
     { id: 6, name: "Converse" },
     { id: 7, name: "New Balance" },
-    { id: 8, name: "Under Armour" }
+    { id: 8, name: "Puma" }
   ]);
 
   const sizes = ["XS", "S", "M", "L", "XL"];
 
   const [filters, setFilters] = useState({
-    brand: "",
+    brand: searchParams.get("brand") || "",
     size: "",
     min_price: "",
     max_price: "",
@@ -31,17 +36,30 @@ export default function Shop() {
   const limit = 6;
 
   useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      brand: searchParams.get("brand") || ""
+    }));
+  }, [searchParams]);
+
+  useEffect(() => {
     async function loadProducts() {
       try {
         setLoading(true);
         setError("");
 
-        const data = await fetchProducts({
-          brand: filters.brand,
-          min_price: filters.min_price,
-          max_price: filters.max_price,
-          sort: filters.sort
-        });
+        let data = [];
+
+        if (query.trim()) {
+          data = await searchProducts(query.trim());
+        } else {
+          data = await fetchProducts({
+            brand: filters.brand,
+            min_price: filters.min_price,
+            max_price: filters.max_price,
+            sort: filters.sort
+          });
+        }
 
         setProducts(data);
       } catch (err) {
@@ -52,20 +70,50 @@ export default function Shop() {
     }
 
     loadProducts();
-  }, [filters.brand, filters.min_price, filters.max_price, filters.sort]);
+  }, [query, filters.brand, filters.min_price, filters.max_price, filters.sort]);
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
+    if (filters.brand !== "") {
+      result = result.filter(
+        (product) => String(product.brand_id) === String(filters.brand)
+      );
+    }
+
     if (filters.size !== "") {
       result = result.filter((product) => {
-        if (!product.sizes || !Array.isArray(product.sizes)) return true;
-        return product.sizes.includes(filters.size);
+        if (!product.sizes) return true;
+
+        if (Array.isArray(product.sizes)) {
+          return product.sizes.includes(filters.size);
+        }
+
+        if (typeof product.sizes === "string") {
+          return product.sizes
+            .split(",")
+            .map((s) => s.trim())
+            .includes(filters.size);
+        }
+
+        return true;
       });
     }
 
+    if (filters.min_price !== "") {
+      result = result.filter(
+        (product) => Number(product.price) >= Number(filters.min_price)
+      );
+    }
+
+    if (filters.max_price !== "") {
+      result = result.filter(
+        (product) => Number(product.price) <= Number(filters.max_price)
+      );
+    }
+
     return result;
-  }, [filters.size, products]);
+  }, [filters.brand, filters.size, filters.min_price, filters.max_price, products]);
 
   const totalProducts = filteredProducts.length;
   const totalPages = Math.ceil(totalProducts / limit);
@@ -78,11 +126,24 @@ export default function Shop() {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
+
     setFilters((prev) => ({
       ...prev,
       [name]: value,
       page: 1
     }));
+
+    if (name === "brand") {
+      const next = new URLSearchParams(searchParams);
+
+      if (value) next.set("brand", value);
+      else next.delete("brand");
+
+      // choosing a brand clears search query so reload won't stay stuck on old search
+      next.delete("q");
+
+      setSearchParams(next);
+    }
   };
 
   const handleApplyFilters = (e) => {
@@ -98,6 +159,8 @@ export default function Shop() {
       sort: "",
       page: 1
     });
+
+    setSearchParams({});
   };
 
   const handleSortChange = (e) => {
@@ -122,15 +185,12 @@ export default function Shop() {
         .breadcrumb {
           --bs-breadcrumb-divider-color: white !important;
         }
-
         .breadcrumb-item + .breadcrumb-item::before {
           color: white !important;
         }
-
         .breadcrumb a {
           color: white;
         }
-
         .breadcrumb a:hover {
           text-decoration: underline;
           color: #f8f9fa;
@@ -155,9 +215,9 @@ export default function Shop() {
           <nav aria-label="breadcrumb">
             <ol className="breadcrumb justify-content-center mb-2">
               <li className="breadcrumb-item">
-                <a href="/" className="text-white text-decoration-none">
+                <Link to="/" className="text-white text-decoration-none">
                   Home
-                </a>
+                </Link>
               </li>
               <li className="breadcrumb-item active text-white" aria-current="page">
                 Shop
@@ -169,7 +229,13 @@ export default function Shop() {
       </div>
 
       <div className="container mt-5">
-        <h2 className="text-center fw-bold mb-4">Shop</h2>
+        <h2 className="text-center fw-bold mb-2">Shop</h2>
+
+        {query && (
+          <p className="text-center text-muted mb-4">
+            Search results for: <strong>{query}</strong>
+          </p>
+        )}
 
         <div className="row">
           <div className="col-md-3 mb-4">
@@ -179,9 +245,7 @@ export default function Shop() {
 
                 <form onSubmit={handleApplyFilters}>
                   <div className="mb-3">
-                    <label htmlFor="brand" className="form-label">
-                      Brand
-                    </label>
+                    <label htmlFor="brand" className="form-label">Brand</label>
                     <select
                       className="form-select"
                       id="brand"
@@ -199,9 +263,7 @@ export default function Shop() {
                   </div>
 
                   <div className="mb-3">
-                    <label htmlFor="size" className="form-label">
-                      Size
-                    </label>
+                    <label htmlFor="size" className="form-label">Size</label>
                     <select
                       className="form-select"
                       id="size"
@@ -290,7 +352,7 @@ export default function Shop() {
                     <div className="col-6 col-md-4" key={product.id}>
                       <div className="card h-100 shadow-sm border-0">
                         <img
-                          src={product.image}
+                          src={getImageUrl(product.image)}
                           className="card-img-top"
                           style={{ height: "180px", objectFit: "cover" }}
                           alt={product.name}
@@ -299,18 +361,14 @@ export default function Shop() {
                           <h6 className="fw-bold">{product.name}</h6>
                           <p className="text-muted small mb-1">{product.brand_name}</p>
                           <p className="text-muted small mb-2">
-                            ₱{" "}
-                            {Number(product.price).toLocaleString(undefined, {
+                            ₱ {Number(product.price).toLocaleString(undefined, {
                               minimumFractionDigits: 2
                             })}
                           </p>
                           <p className="text-truncate mb-3">{product.description}</p>
-                          <a
-                            href={`/product?id=${product.id}`}
-                            className="btn btn-sm btn-dark mt-auto"
-                          >
+                          <Link to={`/product?id=${product.id}`} className="btn btn-sm btn-dark mt-auto">
                             View Product
-                          </a>
+                          </Link>
                         </div>
                       </div>
                     </div>
@@ -336,9 +394,7 @@ export default function Shop() {
                     (pageNumber) => (
                       <li
                         key={pageNumber}
-                        className={`page-item ${
-                          pageNumber === filters.page ? "active" : ""
-                        }`}
+                        className={`page-item ${pageNumber === filters.page ? "active" : ""}`}
                       >
                         <button className="page-link" onClick={() => goToPage(pageNumber)}>
                           {pageNumber}
@@ -347,11 +403,7 @@ export default function Shop() {
                     )
                   )}
 
-                  <li
-                    className={`page-item ${
-                      filters.page >= totalPages ? "disabled" : ""
-                    }`}
-                  >
+                  <li className={`page-item ${filters.page >= totalPages ? "disabled" : ""}`}>
                     <button className="page-link" onClick={() => goToPage(filters.page + 1)}>
                       <span aria-hidden="true">&raquo;</span>
                     </button>

@@ -1,114 +1,65 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { fetchAdminDashboardSummary } from "../services/adminService";
+import { Link } from "react-router-dom";
+import PageLoader from "../components/PageLoader";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function AdminDash() {
   const [adminUser] = useState({
     username: "admin"
   });
 
-  const [summary] = useState({
-    totalOrders: 24,
-    totalProducts: 18,
-    totalStock: 67,
-    totalSales: 154320
+  const [summary, setSummary] = useState({
+    totalOrders: 0,
+    totalProducts: 0,
+    totalStock: 0,
+    totalSales: 0
   });
 
-  const [recentOrders] = useState([
-    {
-      id: 201,
-      username: "sampleuser",
-      order_date: "2026-04-13 09:15:00",
-      total: 10990,
-      status: "pending"
-    },
-    {
-      id: 202,
-      username: "john_doe",
-      order_date: "2026-04-12 15:40:00",
-      total: 7995,
-      status: "completed"
-    },
-    {
-      id: 203,
-      username: "maria123",
-      order_date: "2026-04-12 10:05:00",
-      total: 6800,
-      status: "shipped"
-    },
-    {
-      id: 204,
-      username: "ashley",
-      order_date: "2026-04-11 18:30:00",
-      total: 5495,
-      status: "packed"
-    },
-    {
-      id: 205,
-      username: "kevinp",
-      order_date: "2026-04-11 09:20:00",
-      total: 11295,
-      status: "completed"
-    }
-  ]);
-
-  const [lowStockProducts] = useState([
-    { name: "Nike Air Force 1", total_stock: 5 },
-    { name: "Adidas Samba OG", total_stock: 3 },
-    { name: "Jordan Retro 3", total_stock: 2 }
-  ]);
-
-  const salesOverview = useMemo(
-    () => [
-      { date: "2026-04-07", revenue: 15200 },
-      { date: "2026-04-08", revenue: 9800 },
-      { date: "2026-04-09", revenue: 12150 },
-      { date: "2026-04-10", revenue: 18700 },
-      { date: "2026-04-11", revenue: 14200 },
-      { date: "2026-04-12", revenue: 22100 },
-      { date: "2026-04-13", revenue: 17350 }
-    ],
-    []
-  );
-
-  const ordersOverview = useMemo(
-    () => [
-      { date: "2026-04-07", count: 3 },
-      { date: "2026-04-08", count: 2 },
-      { date: "2026-04-09", count: 4 },
-      { date: "2026-04-10", count: 5 },
-      { date: "2026-04-11", count: 3 },
-      { date: "2026-04-12", count: 6 },
-      { date: "2026-04-13", count: 4 }
-    ],
-    []
-  );
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const formatMoney = (value) =>
     Number(value).toLocaleString(undefined, {
       minimumFractionDigits: 2
     });
 
-  const handleLogout = () => {
-    console.log("Admin logout");
+  useEffect(() => {
+    async function loadDashboard() {
+      try {
+        setLoading(true);
+        const data = await fetchAdminDashboardSummary();
+        setSummary(data.summary || {});
+        setRecentOrders(data.recentOrders || []);
+        setLowStockProducts(data.lowStockProducts || []);
+      } catch (error) {
+        console.error(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboard();
+  }, []);
+
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error.message);
+    }
   };
 
-  const printChart = (chartId) => {
-    const canvas = document.getElementById(chartId);
-    if (!canvas) return;
+  const adminNavClass = ({ isActive }) =>
+  `btn btn-sm me-2 ${isActive ? "btn-light text-dark" : "btn-outline-light"}`;
 
-    const win = window.open("", "_blank");
-    if (!win) return;
-
-    win.document.write("<html><head><title>Print Chart</title></head><body>");
-    win.document.write(
-      `<h3 style="text-align:center;">${chartId.replace("Chart", "")}</h3>`
-    );
-    win.document.write(
-      `<img src="${canvas.toDataURL()}" style="width:100%;">`
-    );
-    win.document.write("</body></html>");
-    win.document.close();
-    win.print();
-  };
+  if (loading) return <PageLoader text="Loading product..." />;
 
   return (
     <div>
@@ -116,24 +67,21 @@ export default function AdminDash() {
         <div className="d-flex align-items-center">
           <h4 className="mb-0 text-white me-4">Admin Panel</h4>
 
-          <a
-            href="/admindash"
-            className="btn btn-sm btn-outline-light me-2 active"
-          >
+          <NavLink to="/admindash" className={adminNavClass}>
             Dashboard
-          </a>
+          </NavLink>
 
-          <a href="/admin" className="btn btn-sm btn-outline-light me-2">
+          <NavLink to="/admin" className={adminNavClass}>
             Manage Products
-          </a>
+          </NavLink>
 
-          <a href="/createadmin" className="btn btn-sm btn-outline-light">
+          <NavLink to="/createadmin" className={adminNavClass}>
             Manage Admins
-          </a>
+          </NavLink>
         </div>
 
         <div className="d-flex align-items-center">
-          <span className="me-3 text-white">Welcome, {adminUser.username}</span>
+          <span className="me-3 text-white">Welcome, {user?.username || "admin"}</span>
           <button
             type="button"
             className="btn btn-outline-light btn-sm text-decoration-none"
@@ -185,90 +133,6 @@ export default function AdminDash() {
           </div>
         </div>
 
-        <div className="row g-4 mb-4">
-          <div className="col-md-6">
-            <div className="card shadow">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6>Sales Overview</h6>
-                  <button
-                    className="btn btn-sm btn-dark"
-                    onClick={() => printChart("salesChart")}
-                  >
-                    🖨 Print
-                  </button>
-                </div>
-
-                <canvas id="salesChart"></canvas>
-
-                <div className="table-responsive mt-3">
-                  <table className="table table-bordered table-sm">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Date</th>
-                        <th>Revenue (₱)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {salesOverview.map((row) => (
-                        <tr key={row.date}>
-                          <td>{row.date}</td>
-                          <td>{formatMoney(row.revenue)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <p className="text-muted small mb-0">
-                  Connect this canvas to Chart.js later using backend API data.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-md-6">
-            <div className="card shadow">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6>Orders Overview</h6>
-                  <button
-                    className="btn btn-sm btn-dark"
-                    onClick={() => printChart("ordersChart")}
-                  >
-                    🖨 Print
-                  </button>
-                </div>
-
-                <canvas id="ordersChart"></canvas>
-
-                <div className="table-responsive mt-3">
-                  <table className="table table-bordered table-sm">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Date</th>
-                        <th>Orders</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ordersOverview.map((row) => (
-                        <tr key={row.date}>
-                          <td>{row.date}</td>
-                          <td>{row.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <p className="text-muted small mb-0">
-                  Connect this canvas to Chart.js later using backend API data.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="row g-4">
           <div className="col-md-7">
             <div className="card shadow">
@@ -293,10 +157,7 @@ export default function AdminDash() {
                         <td>{order.username}</td>
                         <td>{order.order_date}</td>
                         <td>₱{formatMoney(order.total)}</td>
-                        <td>
-                          {order.status.charAt(0).toUpperCase() +
-                            order.status.slice(1)}
-                        </td>
+                        <td>{order.status}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -320,7 +181,7 @@ export default function AdminDash() {
 
                   <tbody>
                     {lowStockProducts.map((product, index) => (
-                      <tr key={index} style={{ backgroundColor: "#a5a6a7ff" }}>
+                      <tr key={index}>
                         <td>{product.name}</td>
                         <td>{product.total_stock}</td>
                       </tr>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -227,9 +228,9 @@ export default function Register() {
 
             <p className="register-footer-text">
               Already have an account?{" "}
-              <a href="/login" className="register-link" accessKey="S">
+              <Link to="/login" className="register-link" accessKey="S">
                 <span style={{ textDecoration: "underline" }}>S</span>ign in
-              </a>
+              </Link>
             </p>
           </form>
         </div>

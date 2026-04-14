@@ -4,6 +4,7 @@ import {
   fetchWishlist,
   removeFromWishlist
 } from "../services/wishlistService";
+import { getImageUrl } from "../utils/image";
 
 export default function Wishlist() {
   const [wishlistItems, setWishlistItems] = useState([]);
@@ -137,7 +138,7 @@ export default function Wishlist() {
               <div className="col-6 col-md-3 d-flex" key={item.wishlist_id}>
                 <div className="card h-100 shadow-sm border-0 flex-fill">
                   <img
-                    src={item.image}
+                    src={getImageUrl(item.image)}
                     className="card-img-top"
                     style={{ height: "180px", objectFit: "cover" }}
                     alt={item.name}

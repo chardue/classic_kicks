@@ -1,122 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
+import { fetchAccount, updateAccount } from "../services/accountService";
+import {
+  fetchAddresses,
+  addAddress,
+  updateAddress,
+  deleteAddress
+} from "../services/addressService";
+import { fetchMyOrders, cancelOrder } from "../services/orderService";
+import { getImageUrl } from "../utils/image";
+import { Link } from "react-router-dom";
+import PageLoader from "../components/PageLoader";
 
 export default function MyAccount() {
   const [message, setMessage] = useState("");
   const [messageClass, setMessageClass] = useState("alert-info");
   const [activeTab, setActiveTab] = useState("#account");
+  const [loading, setLoading] = useState(true);
 
   const [user, setUser] = useState({
-    email: "sampleuser@gmail.com",
-    username: "sampleuser"
+    email: "",
+    username: ""
   });
 
   const [customer, setCustomer] = useState({
-    email: "sampleuser@gmail.com",
-    first_name: "John",
-    last_name: "Doe",
-    phone: "9123456789"
+    email: "",
+    first_name: "",
+    last_name: "",
+    phone: ""
   });
 
-  const [addresses, setAddresses] = useState([
-    {
-      address_id: 1,
-      address_name: "Home",
-      house_street: "123 Shoe Street",
-      barangay: "Barangay 123",
-      city: "Manila",
-      province: "Metro Manila",
-      region: "NCR",
-      postal_code: "1000",
-      country: "Philippines",
-      is_default: true
-    },
-    {
-      address_id: 2,
-      address_name: "Office",
-      house_street: "45 Sneaker Ave",
-      barangay: "Barangay 456",
-      city: "Quezon City",
-      province: "Metro Manila",
-      region: "NCR",
-      postal_code: "1100",
-      country: "Philippines",
-      is_default: false
-    }
-  ]);
-
-  const [orders, setOrders] = useState([
-    {
-      order_id: 101,
-      order_date: "2026-04-10",
-      total: 17790,
-      status: "Pending",
-      address: {
-        house_street: "123 Shoe Street",
-        barangay: "Barangay 123",
-        city: "Manila",
-        province: "Metro Manila",
-        region: "NCR",
-        postal_code: "1000",
-        country: "Philippines"
-      },
-      items: [
-        {
-          product_name: "Nike Air Force 1",
-          image: "/images/products/AF1.webp",
-          quantity: 2,
-          price: 5495,
-          size: "M"
-        },
-        {
-          product_name: "Adidas Samba OG",
-          image: "/images/products/AdidasSambaOG.webp",
-          quantity: 1,
-          price: 6800,
-          size: "S"
-        }
-      ]
-    },
-    {
-      order_id: 102,
-      order_date: "2026-04-05",
-      total: 7995,
-      status: "Completed",
-      address: {
-        house_street: "45 Sneaker Ave",
-        barangay: "Barangay 456",
-        city: "Quezon City",
-        province: "Metro Manila",
-        region: "NCR",
-        postal_code: "1100",
-        country: "Philippines"
-      },
-      items: [
-        {
-          product_name: "New Balance 550",
-          image: "/images/products/NB550.webp",
-          quantity: 1,
-          price: 7995,
-          size: "L"
-        }
-      ]
-    }
-  ]);
+  const [addresses, setAddresses] = useState([]);
+  const [orders, setOrders] = useState([]);
 
   const [editAccountForm, setEditAccountForm] = useState({
-    first_name: customer.first_name || "",
-    last_name: customer.last_name || "",
-    email: customer.email || user.email || "",
-    phone: customer.phone || ""
-  });
-
-  const [changeUsernameForm, setChangeUsernameForm] = useState({
-    username: user.username || ""
-  });
-
-  const [changePasswordForm, setChangePasswordForm] = useState({
-    current_password: "",
-    new_password: "",
-    confirm_password: ""
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: ""
   });
 
   const emptyAddressForm = {
@@ -146,6 +66,39 @@ export default function MyAccount() {
   }, [activeTab]);
 
   useEffect(() => {
+    async function loadMyAccount() {
+      try {
+        setLoading(true);
+
+        const [accountData, addressData, orderData] = await Promise.all([
+          fetchAccount(),
+          fetchAddresses(),
+          fetchMyOrders()
+        ]);
+
+        setUser(accountData.user || { email: "", username: "" });
+        setCustomer(
+          accountData.customer || {
+            email: "",
+            first_name: "",
+            last_name: "",
+            phone: ""
+          }
+        );
+        setAddresses(addressData || []);
+        setOrders(orderData || []);
+      } catch (error) {
+        setMessage(error.message);
+        setMessageClass("alert-danger");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadMyAccount();
+  }, []);
+
+  useEffect(() => {
     setEditAccountForm({
       first_name: customer.first_name || "",
       last_name: customer.last_name || "",
@@ -155,19 +108,19 @@ export default function MyAccount() {
   }, [customer, user]);
 
   useEffect(() => {
-    setChangeUsernameForm({
-      username: user.username || ""
-    });
-  }, [user]);
-
-  useEffect(() => {
     if (!message) return;
     const timer = setTimeout(() => {
       setMessage("");
       setMessageClass("alert-info");
-    }, 2000);
+    }, 2500);
     return () => clearTimeout(timer);
   }, [message]);
+
+  const notificationOrders = useMemo(() => {
+    return [...orders].sort(
+      (a, b) => new Date(b.order_date) - new Date(a.order_date)
+    );
+  }, [orders]);
 
   const formatMoney = (value) =>
     Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -181,25 +134,15 @@ export default function MyAccount() {
 
   const canCancelOrder = (order) => {
     const orderTime = new Date(order.order_date).getTime();
-    const now = new Date().getTime();
+    const now = Date.now();
     const timeDiff = now - orderTime;
-    return timeDiff <= 3600 * 1000 && order.status === "Pending";
+    const status = String(order.status || "").toLowerCase();
+    return timeDiff <= 3600 * 1000 && status === "pending";
   };
-
-  const notificationOrders = useMemo(() => {
-    return [...orders].sort(
-      (a, b) => new Date(b.order_date) - new Date(a.order_date)
-    );
-  }, [orders]);
 
   const showFlash = (text, type = "alert-success") => {
     setMessage(text);
     setMessageClass(type);
-  };
-
-  const handleLogout = () => {
-    console.log("Logout clicked");
-    showFlash("Logout clicked.", "alert-success");
   };
 
   const handleEditAccountChange = (e) => {
@@ -207,75 +150,29 @@ export default function MyAccount() {
     setEditAccountForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveAccount = (e) => {
+  const handleSaveAccount = async (e) => {
     e.preventDefault();
 
-    setCustomer((prev) => ({
-      ...prev,
-      first_name: editAccountForm.first_name,
-      last_name: editAccountForm.last_name,
-      email: editAccountForm.email,
-      phone: editAccountForm.phone
-    }));
+    try {
+      const data = await updateAccount(editAccountForm);
 
-    setUser((prev) => ({
-      ...prev,
-      email: editAccountForm.email
-    }));
+      setCustomer((prev) => ({
+        ...prev,
+        first_name: editAccountForm.first_name,
+        last_name: editAccountForm.last_name,
+        email: editAccountForm.email,
+        phone: editAccountForm.phone
+      }));
 
-    showFlash("Personal information updated successfully!");
-  };
+      setUser((prev) => ({
+        ...prev,
+        email: editAccountForm.email
+      }));
 
-  const handleUsernameChange = (e) => {
-    const { name, value } = e.target;
-    setChangeUsernameForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSaveUsername = (e) => {
-    e.preventDefault();
-
-    if (!changeUsernameForm.username.trim()) {
-      showFlash("Username cannot be empty.", "alert-danger");
-      return;
+      showFlash(data.message || "Personal information updated successfully!");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
     }
-
-    setUser((prev) => ({
-      ...prev,
-      username: changeUsernameForm.username.trim()
-    }));
-
-    showFlash("Username updated successfully!");
-  };
-
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setChangePasswordForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSavePassword = (e) => {
-    e.preventDefault();
-
-    if (
-      !changePasswordForm.current_password ||
-      !changePasswordForm.new_password ||
-      !changePasswordForm.confirm_password
-    ) {
-      showFlash("Please fill in all password fields.", "alert-danger");
-      return;
-    }
-
-    if (changePasswordForm.new_password !== changePasswordForm.confirm_password) {
-      showFlash("New passwords do not match.", "alert-danger");
-      return;
-    }
-
-    setChangePasswordForm({
-      current_password: "",
-      new_password: "",
-      confirm_password: ""
-    });
-
-    showFlash("Password updated successfully!");
   };
 
   const handleAddAddressChange = (e) => {
@@ -286,30 +183,22 @@ export default function MyAccount() {
     }));
   };
 
-  const handleAddAddress = (e) => {
+  const handleAddAddress = async (e) => {
     e.preventDefault();
 
-    const newAddress = {
-      ...addAddressForm,
-      address_id: Date.now()
-    };
-
-    let nextAddresses = [...addresses];
-
-    if (newAddress.is_default) {
-      nextAddresses = nextAddresses.map((addr) => ({
-        ...addr,
-        is_default: false
-      }));
+    try {
+      const data = await addAddress(addAddressForm);
+      const refreshed = await fetchAddresses();
+      setAddresses(refreshed);
+      setAddAddressForm(emptyAddressForm);
+      showFlash(data.message || "Address added successfully!");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
     }
-
-    setAddresses([...nextAddresses, newAddress]);
-    setAddAddressForm(emptyAddressForm);
-    showFlash("Address added successfully!");
   };
 
   const openEditAddress = (address) => {
-    setEditingAddress({ ...address });
+    setEditingAddress({ ...address, is_default: !!Number(address.is_default) || !!address.is_default });
   };
 
   const handleEditAddressChange = (e) => {
@@ -320,63 +209,55 @@ export default function MyAccount() {
     }));
   };
 
-  const handleSaveEditedAddress = (e) => {
+  const handleSaveEditedAddress = async (e) => {
     e.preventDefault();
     if (!editingAddress) return;
 
-    let nextAddresses = [...addresses];
-
-    if (editingAddress.is_default) {
-      nextAddresses = nextAddresses.map((addr) => ({
-        ...addr,
-        is_default: false
-      }));
+    try {
+      const data = await updateAddress(editingAddress.address_id, editingAddress);
+      const refreshed = await fetchAddresses();
+      setAddresses(refreshed);
+      setEditingAddress(null);
+      showFlash(data.message || "Address updated successfully!");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
     }
-
-    nextAddresses = nextAddresses.map((addr) =>
-      addr.address_id === editingAddress.address_id ? editingAddress : addr
-    );
-
-    setAddresses(nextAddresses);
-    setEditingAddress(null);
-    showFlash("Address updated successfully!");
   };
 
-  const handleDeleteAddress = (addressId) => {
+  const handleDeleteAddress = async (addressId) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this address?"
     );
     if (!confirmed) return;
 
-    setAddresses((prev) =>
-      prev.filter((addr) => addr.address_id !== addressId)
-    );
-    showFlash("Address deleted successfully!");
+    try {
+      const data = await deleteAddress(addressId);
+      setAddresses((prev) =>
+        prev.filter((addr) => addr.address_id !== addressId)
+      );
+      showFlash(data.message || "Address deleted successfully!");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
+    }
   };
 
-  const handleDeleteOrder = (orderId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this order receipt?"
-    );
-    if (!confirmed) return;
-
-    setOrders((prev) => prev.filter((order) => order.order_id !== orderId));
-    showFlash("Order receipt deleted successfully!");
-  };
-
-  const handleCancelOrder = (orderId) => {
+  const handleCancelOrder = async (orderId) => {
     const confirmed = window.confirm(
       "Are you sure you want to cancel this order?"
     );
     if (!confirmed) return;
 
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.order_id === orderId ? { ...order, status: "Canceled" } : order
-      )
-    );
-    showFlash("Order canceled successfully!");
+    try {
+      const data = await cancelOrder(orderId);
+      const refreshedOrders = await fetchMyOrders();
+      setOrders(refreshedOrders);
+      showFlash(data.message || "Order canceled successfully!");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
+    }
   };
+
+  if (loading) return <PageLoader text="Loading product..." />;
 
   return (
     <div className="container mt-5 mb-5">
@@ -435,17 +316,13 @@ export default function MyAccount() {
             >
               Order Notifications
             </button>
-
-            <button className="btn btn-danger text-start" onClick={handleLogout}>
-              Logout
-            </button>
           </div>
         </div>
 
         <div className="col-md-9">
           <div className="tab-content">
             {activeTab === "#account" && (
-              <div className="tab-pane fade show active" id="account">
+              <div className="tab-pane fade show active">
                 <div className="card shadow-sm border-0 mb-4">
                   <div className="card-header bg-white d-flex justify-content-between align-items-center">
                     <h5 className="mb-0">Personal Information</h5>
@@ -471,22 +348,6 @@ export default function MyAccount() {
                     <div className="col-md-6">
                       <strong>Phone:</strong>
                       <span>&nbsp;+63</span> {customer.phone || ""}
-                    </div>
-                    <div className="col-12 mt-3">
-                      <button
-                        className="btn btn-dark me-2"
-                        data-bs-toggle="modal"
-                        data-bs-target="#changeUsernameModal"
-                      >
-                        Change Username
-                      </button>
-                      <button
-                        className="btn btn-dark"
-                        data-bs-toggle="modal"
-                        data-bs-target="#changePasswordModal"
-                      >
-                        Change Password
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -521,7 +382,7 @@ export default function MyAccount() {
                                     <br />
                                     {addr.postal_code}, {addr.country}
                                   </p>
-                                  {addr.is_default && (
+                                  {Number(addr.is_default) === 1 && (
                                     <span className="badge bg-primary">Default</span>
                                   )}
                                 </div>
@@ -560,7 +421,7 @@ export default function MyAccount() {
             )}
 
             {activeTab === "#orders" && (
-              <div className="tab-pane fade show active" id="orders">
+              <div className="tab-pane fade show active">
                 <div className="card shadow-sm border-0">
                   <div className="card-body">
                     <h5 className="fw-bold mb-3">My Orders</h5>
@@ -575,14 +436,6 @@ export default function MyAccount() {
                             className="position-absolute"
                             style={{ top: "10px", right: "10px" }}
                           >
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-danger me-1 delete-order-btn"
-                              onClick={() => handleDeleteOrder(order.order_id)}
-                            >
-                              Delete
-                            </button>
-
                             {canCancelOrder(order) && (
                               <button
                                 type="button"
@@ -599,9 +452,9 @@ export default function MyAccount() {
                             Status:
                             <span
                               className={`badge ms-1 ${
-                                order.status === "Canceled"
+                                String(order.status).toLowerCase() === "canceled"
                                   ? "bg-danger"
-                                  : order.status === "Pending"
+                                  : String(order.status).toLowerCase() === "pending"
                                   ? "bg-warning text-dark"
                                   : "bg-success"
                               }`}
@@ -625,12 +478,12 @@ export default function MyAccount() {
                             Total: ₱ {formatMoney(order.total)}
                           </p>
 
-                          <a
-                            href={`/thanks?order_id=${order.order_id}`}
+                          <Link
+                            to={`/order-tracking?order_id=${order.order_id}`}
                             className="btn btn-primary btn-sm mb-3"
                           >
-                            🧾 View Receipt
-                          </a>
+                            Track Order
+                          </Link>
 
                           <div className="row g-3">
                             {order.items.map((item, index) => (
@@ -639,7 +492,7 @@ export default function MyAccount() {
                                 key={`${order.order_id}-${index}`}
                               >
                                 <img
-                                  src={item.image}
+                                  src={getImageUrl(item.image)}
                                   alt={item.product_name}
                                   className="me-2"
                                   style={{
@@ -673,11 +526,7 @@ export default function MyAccount() {
             )}
 
             {activeTab === "#orderNotifications" && (
-              <div
-                className="tab-pane fade show active"
-                id="orderNotifications"
-                role="tabpanel"
-              >
+              <div className="tab-pane fade show active">
                 <div className="card shadow-sm border-0">
                   <div className="card-body">
                     <h5 className="fw-bold mb-3">Order Notifications & Tracking</h5>
@@ -698,9 +547,9 @@ export default function MyAccount() {
                                 <strong>
                                   <span
                                     className={
-                                      order.status === "Canceled"
+                                      String(order.status).toLowerCase() === "canceled"
                                         ? "text-danger"
-                                        : order.status === "Pending"
+                                        : String(order.status).toLowerCase() === "pending"
                                         ? "text-warning"
                                         : "text-success"
                                     }
@@ -715,12 +564,12 @@ export default function MyAccount() {
                             </div>
 
                             <div>
-                              <a
-                                href={`/order-tracking?order_id=${order.order_id}`}
+                              <Link
+                                to={`/order-tracking?order_id=${order.order_id}`}
                                 className="btn btn-sm btn-primary"
                               >
                                 Track Order
-                              </a>
+                              </Link>
                             </div>
                           </div>
                         </div>
@@ -742,11 +591,7 @@ export default function MyAccount() {
             <form onSubmit={handleSaveAccount}>
               <div className="modal-header">
                 <h5 className="modal-title">Edit Personal Information</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  data-bs-dismiss="modal"
-                ></button>
+                <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
               </div>
 
               <div className="modal-body row g-3">
@@ -785,7 +630,7 @@ export default function MyAccount() {
 
                 <div className="col-md-6">
                   <label className="form-label">Phone</label>
-                  <div className="input-group mb-3">
+                  <div className="input-group">
                     <span className="input-group-text">+63</span>
                     <input
                       name="phone"
@@ -807,129 +652,11 @@ export default function MyAccount() {
               </div>
 
               <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-light"
-                  data-bs-dismiss="modal"
-                >
+                <button type="button" className="btn btn-light" data-bs-dismiss="modal">
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="modal fade"
-        id="changeUsernameModal"
-        tabIndex="-1"
-        aria-hidden="true"
-      >
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content">
-            <form onSubmit={handleSaveUsername}>
-              <div className="modal-header">
-                <h5 className="modal-title">Change Username</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  data-bs-dismiss="modal"
-                ></button>
-              </div>
-
-              <div className="modal-body">
-                <label className="form-label">New Username</label>
-                <input
-                  type="text"
-                  name="username"
-                  className="form-control"
-                  value={changeUsernameForm.username}
-                  onChange={handleUsernameChange}
-                  required
-                />
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-dark"
-                  data-bs-dismiss="modal"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Save Username
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="modal fade"
-        id="changePasswordModal"
-        tabIndex="-1"
-        aria-hidden="true"
-      >
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content">
-            <form onSubmit={handleSavePassword}>
-              <div className="modal-header">
-                <h5 className="modal-title">Change Password</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  data-bs-dismiss="modal"
-                ></button>
-              </div>
-
-              <div className="modal-body">
-                <label className="form-label">Current Password</label>
-                <input
-                  type="password"
-                  name="current_password"
-                  className="form-control mb-3"
-                  value={changePasswordForm.current_password}
-                  onChange={handlePasswordChange}
-                  required
-                />
-
-                <label className="form-label">New Password</label>
-                <input
-                  type="password"
-                  name="new_password"
-                  className="form-control mb-3"
-                  value={changePasswordForm.new_password}
-                  onChange={handlePasswordChange}
-                  required
-                />
-
-                <label className="form-label">Confirm New Password</label>
-                <input
-                  type="password"
-                  name="confirm_password"
-                  className="form-control"
-                  value={changePasswordForm.confirm_password}
-                  onChange={handlePasswordChange}
-                  required
-                />
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-dark"
-                  data-bs-dismiss="modal"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Save Password
                 </button>
               </div>
             </form>
@@ -943,11 +670,7 @@ export default function MyAccount() {
             <form onSubmit={handleAddAddress}>
               <div className="modal-header">
                 <h5 className="modal-title">Add New Address</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  data-bs-dismiss="modal"
-                ></button>
+                <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
               </div>
 
               <div className="modal-body row g-3">
@@ -957,7 +680,6 @@ export default function MyAccount() {
                     type="text"
                     name="address_name"
                     className="form-control"
-                    placeholder="Home / Office / Parents"
                     value={addAddressForm.address_name}
                     onChange={handleAddAddressChange}
                     required
@@ -1034,12 +756,6 @@ export default function MyAccount() {
                     max="9999"
                     value={addAddressForm.postal_code}
                     onChange={handleAddAddressChange}
-                    onInput={(e) => {
-                      if (e.target.value.length > 4) {
-                        e.target.value = e.target.value.slice(0, 4);
-                      }
-                    }}
-                    placeholder="e.g., 1100"
                     required
                   />
                 </div>
@@ -1059,11 +775,7 @@ export default function MyAccount() {
               </div>
 
               <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-light"
-                  data-bs-dismiss="modal"
-                >
+                <button type="button" className="btn btn-light" data-bs-dismiss="modal">
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-success">
@@ -1084,11 +796,7 @@ export default function MyAccount() {
                   <h5 className="modal-title">
                     Edit Address ({editingAddress.address_name})
                   </h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    data-bs-dismiss="modal"
-                  ></button>
+                  <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
                 </div>
 
                 <div className="modal-body row g-3">
@@ -1174,12 +882,6 @@ export default function MyAccount() {
                       max="9999"
                       value={editingAddress.postal_code}
                       onChange={handleEditAddressChange}
-                      onInput={(e) => {
-                        if (e.target.value.length > 4) {
-                          e.target.value = e.target.value.slice(0, 4);
-                        }
-                      }}
-                      placeholder="e.g., 1100"
                       required
                     />
                   </div>
@@ -1190,7 +892,7 @@ export default function MyAccount() {
                         type="checkbox"
                         className="form-check-input"
                         name="is_default"
-                        checked={editingAddress.is_default}
+                        checked={!!editingAddress.is_default}
                         onChange={handleEditAddressChange}
                       />
                       <label className="form-check-label">Set as Default</label>
@@ -1199,11 +901,7 @@ export default function MyAccount() {
                 </div>
 
                 <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-light"
-                    data-bs-dismiss="modal"
-                  >
+                  <button type="button" className="btn btn-light" data-bs-dismiss="modal">
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary">

@@ -12,6 +12,7 @@ export async function getProducts(req, res) {
         p.price,
         p.image,
         p.quantity,
+        p.sizes,
         b.id AS brand_id,
         b.name AS brand_name
       FROM products p
@@ -112,6 +113,12 @@ export async function searchProducts(req, res) {
   try {
     const { q = "" } = req.query;
 
+    const searchTerm = q.trim();
+
+    if (!searchTerm) {
+      return res.json([]);
+    }
+
     const [rows] = await pool.execute(
       `
       SELECT 
@@ -121,13 +128,15 @@ export async function searchProducts(req, res) {
         p.price,
         p.image,
         p.quantity,
+        p.sizes,
+        b.id AS brand_id,
         b.name AS brand_name
       FROM products p
       LEFT JOIN brands b ON p.brand_id = b.id
       WHERE p.name LIKE ? OR p.description LIKE ?
       ORDER BY p.id DESC
       `,
-      [`%${q}%`, `%${q}%`]
+      [`%${searchTerm}%`, `%${searchTerm}%`]
     );
 
     return res.json(rows);

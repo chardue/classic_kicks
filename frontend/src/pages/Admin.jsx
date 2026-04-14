@@ -1,9 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  fetchAdminProducts,
+  createAdminProduct,
+  updateAdminProduct,
+  deleteAdminProduct,
+  fetchAdminOrders,
+  updateAdminOrderStatus,
+  fetchBestSellerReport,
+  fetchWishlistAlerts
+} from "../services/adminService";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import PageLoader from "../components/PageLoader";
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("#create");
   const [editingProductId, setEditingProductId] = useState(null);
   const [message, setMessage] = useState("");
+  const [messageClass, setMessageClass] = useState("alert-info");
+  const [loading, setLoading] = useState(true);
 
   const [adminUser] = useState({
     username: "admin"
@@ -13,62 +28,17 @@ export default function Admin() {
     { id: 1, name: "Nike" },
     { id: 2, name: "Adidas" },
     { id: 3, name: "Jordan" },
-    { id: 4, name: "Puma" },
+    { id: 4, name: "Under Armour" },
     { id: 5, name: "Anta" },
     { id: 6, name: "Converse" },
     { id: 7, name: "New Balance" },
-    { id: 8, name: "Under Armour" }
+    { id: 8, name: "Puma" }
   ]);
 
-  const [products, setProducts] = useState([
-    {
-      id: 1,
-      name: "Nike Air Force 1",
-      brand_id: 1,
-      brand_name: "Nike",
-      description: "Classic everyday sneaker with clean and simple design.",
-      price: 5495,
-      image: "/images/products/AF1.webp",
-      stock: { XS: 0, S: 1, M: 4, L: 2, XL: 1 }
-    },
-    {
-      id: 2,
-      name: "Adidas Samba OG",
-      brand_id: 2,
-      brand_name: "Adidas",
-      description: "Low-profile streetwear favorite with timeless style.",
-      price: 6800,
-      image: "/images/products/AdidasSambaOG.webp",
-      stock: { XS: 0, S: 2, M: 2, L: 0, XL: 0 }
-    }
-  ]);
-
-  const [orders, setOrders] = useState([
-    {
-      id: 101,
-      username: "sampleuser",
-      order_date: "2026-04-10 09:30:00",
-      total: 17790,
-      status: "pending"
-    },
-    {
-      id: 102,
-      username: "john_doe",
-      order_date: "2026-04-11 13:20:00",
-      total: 7995,
-      status: "canceled"
-    }
-  ]);
-
-  const [wishlistAlerts] = useState([
-    {
-      id: 8,
-      name: "Under Armour Curry 4",
-      image: "/images/products/UnderArmourCurry4.webp",
-      price: 8495,
-      wishlist_count: 6
-    }
-  ]);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [wishlistAlerts, setWishlistAlerts] = useState([]);
+  const [bestSellerData, setBestSellerData] = useState([]);
 
   const emptyProductForm = {
     name: "",
@@ -99,13 +69,32 @@ export default function Admin() {
     localStorage.setItem("activeAdminTab", activeTab);
   }, [activeTab]);
 
-  const bestSellerData = useMemo(() => {
-    return [
-      { month: "Jan", nike: 10, adidas: 6, jordan: 4 },
-      { month: "Feb", nike: 8, adidas: 7, jordan: 6 },
-      { month: "Mar", nike: 12, adidas: 5, jordan: 9 },
-      { month: "Apr", nike: 7, adidas: 10, jordan: 8 }
-    ];
+  useEffect(() => {
+    async function loadAdminData() {
+      try {
+        setLoading(true);
+
+        const [productData, orderData, reportData, wishlistData] =
+          await Promise.all([
+            fetchAdminProducts(),
+            fetchAdminOrders(),
+            fetchBestSellerReport(),
+            fetchWishlistAlerts()
+          ]);
+
+        setProducts(productData);
+        setOrders(orderData);
+        setBestSellerData(reportData);
+        setWishlistAlerts(wishlistData);
+      } catch (error) {
+        setMessage(error.message);
+        setMessageClass("alert-danger");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadAdminData();
   }, []);
 
   const formatMoney = (value) =>
@@ -122,10 +111,25 @@ export default function Admin() {
       .join(", ");
   };
 
-  const handleLogout = () => {
-    console.log("Admin logout");
-    setMessage("Logout clicked.");
+  const showFlash = (text, type = "alert-success") => {
+    setMessage(text);
+    setMessageClass(type);
   };
+
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error.message);
+    }
+  };
+
+  const adminNavClass = ({ isActive }) =>
+  `btn btn-sm me-2 ${isActive ? "btn-light text-dark" : "btn-outline-light"}`;
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -152,25 +156,23 @@ export default function Admin() {
     }));
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
 
-    const brand = brands.find((b) => String(b.id) === String(createForm.brand_id));
+    try {
+      const data = await createAdminProduct({
+        ...createForm,
+        brand_id: Number(createForm.brand_id)
+      });
 
-    const newProduct = {
-      id: Date.now(),
-      name: createForm.name,
-      brand_id: Number(createForm.brand_id),
-      brand_name: brand ? brand.name : "",
-      description: createForm.description,
-      price: Number(createForm.price),
-      image: createForm.image || "/images/logo.png",
-      stock: { ...createForm.stock }
-    };
-
-    setProducts((prev) => [newProduct, ...prev]);
-    setCreateForm(emptyProductForm);
-    setMessage("Product added successfully.");
+      const refreshed = await fetchAdminProducts();
+      setProducts(refreshed);
+      setCreateForm(emptyProductForm);
+      showFlash(data.message || "Product added successfully.");
+      setActiveTab("#list");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
+    }
   };
 
   const openEditProduct = (product) => {
@@ -204,50 +206,60 @@ export default function Admin() {
     }));
   };
 
-  const handleUpdateProduct = (e) => {
+  const handleUpdateProduct = async (e) => {
     e.preventDefault();
 
-    const brand = brands.find((b) => String(b.id) === String(editForm.brand_id));
+    try {
+      const data = await updateAdminProduct(editingProductId, {
+        ...editForm,
+        brand_id: Number(editForm.brand_id)
+      });
 
-    setProducts((prev) =>
-      prev.map((product) =>
-        product.id === editingProductId
-          ? {
-              ...product,
-              name: editForm.name,
-              brand_id: Number(editForm.brand_id),
-              brand_name: brand ? brand.name : "",
-              description: editForm.description,
-              price: Number(editForm.price),
-              image: editForm.image,
-              stock: { ...editForm.stock }
-            }
-          : product
-      )
-    );
-
-    setEditingProductId(null);
-    setMessage("Product updated successfully.");
+      const refreshed = await fetchAdminProducts();
+      setProducts(refreshed);
+      setEditingProductId(null);
+      showFlash(data.message || "Product updated successfully.");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
+    }
   };
 
-  const handleDeleteProduct = (id) => {
+  const handleDeleteProduct = async (id) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this product?"
     );
     if (!confirmed) return;
 
-    setProducts((prev) => prev.filter((product) => product.id !== id));
-    setMessage("Product deleted successfully.");
+    try {
+      const data = await deleteAdminProduct(id);
+      setProducts((prev) => prev.filter((product) => product.id !== id));
+      showFlash(data.message || "Product deleted successfully.");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
+    }
   };
 
-  const handleOrderStatusChange = (orderId, newStatus) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
-    setMessage("Order status updated.");
+  const handleOrderStatusChange = async (orderId, newStatus) => {
+    try {
+      const data = await updateAdminOrderStatus(orderId, newStatus);
+
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+
+      showFlash(data.message || "Order status updated.");
+    } catch (error) {
+      showFlash(error.message, "alert-danger");
+    }
   };
+
+  const bestSellerRows = useMemo(() => {
+    return bestSellerData;
+  }, [bestSellerData]);
+
+  if (loading) return <PageLoader text="Loading product..." />;
 
   return (
     <div>
@@ -255,24 +267,21 @@ export default function Admin() {
         <div className="d-flex align-items-center flex-wrap">
           <h4 className="mb-0 text-white me-4">Admin Panel</h4>
 
-          <a href="/admindash" className="btn btn-sm btn-outline-light me-2">
+          <NavLink to="/admindash" className={adminNavClass}>
             Dashboard
-          </a>
+          </NavLink>
 
-          <a
-            href="/admin"
-            className="btn btn-sm btn-outline-light me-2 active"
-          >
+          <NavLink to="/admin" className={adminNavClass}>
             Manage Products
-          </a>
+          </NavLink>
 
-          <a href="/createadmin" className="btn btn-sm btn-outline-light">
+          <NavLink to="/createadmin" className={adminNavClass}>
             Manage Admins
-          </a>
+          </NavLink>
         </div>
 
         <div className="d-flex align-items-center">
-          <span className="me-3 text-white">Welcome, {adminUser.username}</span>
+          <span className="me-3 text-white">Welcome, {user?.username || "admin"}</span>
           <button
             type="button"
             className="btn btn-outline-light btn-sm text-decoration-none"
@@ -284,10 +293,10 @@ export default function Admin() {
       </nav>
 
       <div className="container mt-5 mb-5">
-        {message && <div className="alert alert-info">{message}</div>}
+        {message && <div className={`alert ${messageClass}`}>{message}</div>}
 
-        <ul className="nav admin-nav-tabs" id="adminTab" role="tablist">
-          <li className="nav-item" role="presentation">
+        <ul className="nav admin-nav-tabs" role="tablist">
+          <li className="nav-item">
             <button
               className={`nav-link ${activeTab === "#create" ? "active" : ""}`}
               type="button"
@@ -297,7 +306,7 @@ export default function Admin() {
             </button>
           </li>
 
-          <li className="nav-item" role="presentation">
+          <li className="nav-item">
             <button
               className={`nav-link ${activeTab === "#list" ? "active" : ""}`}
               type="button"
@@ -307,7 +316,7 @@ export default function Admin() {
             </button>
           </li>
 
-          <li className="nav-item" role="presentation">
+          <li className="nav-item">
             <button
               className={`nav-link ${activeTab === "#report" ? "active" : ""}`}
               type="button"
@@ -317,7 +326,7 @@ export default function Admin() {
             </button>
           </li>
 
-          <li className="nav-item" role="presentation">
+          <li className="nav-item">
             <button
               className={`nav-link ${activeTab === "#orders" ? "active" : ""}`}
               type="button"
@@ -327,7 +336,7 @@ export default function Admin() {
             </button>
           </li>
 
-          <li className="nav-item" role="presentation">
+          <li className="nav-item">
             <button
               className={`nav-link ${
                 activeTab === "#wishlist-alert" ? "active" : ""
@@ -340,19 +349,16 @@ export default function Admin() {
           </li>
         </ul>
 
-        <div className="tab-content" id="adminTabContent">
+        <div className="tab-content">
           {activeTab === "#create" && (
-            <div className="tab-pane fade show active" id="create" role="tabpanel">
+            <div className="tab-pane fade show active">
               <div className="mt-3">
                 <form className="mb-5" onSubmit={handleCreateSubmit}>
                   <div className="mb-3">
-                    <label htmlFor="name" className="form-label">
-                      Product Name
-                    </label>
+                    <label className="form-label">Product Name</label>
                     <input
                       type="text"
                       className="form-control"
-                      id="name"
                       name="name"
                       value={createForm.name}
                       onChange={handleCreateChange}
@@ -361,13 +367,10 @@ export default function Admin() {
                   </div>
 
                   <div className="mb-3">
-                    <label htmlFor="brand_id" className="form-label">
-                      Brand
-                    </label>
+                    <label className="form-label">Brand</label>
                     <select
                       className="form-select"
                       name="brand_id"
-                      id="brand_id"
                       value={createForm.brand_id}
                       onChange={handleCreateChange}
                       required
@@ -384,12 +387,9 @@ export default function Admin() {
                   </div>
 
                   <div className="mb-2">
-                    <label htmlFor="description" className="form-label">
-                      Description
-                    </label>
+                    <label className="form-label">Description</label>
                     <textarea
                       className="form-control"
-                      id="description"
                       name="description"
                       rows="3"
                       value={createForm.description}
@@ -398,15 +398,12 @@ export default function Admin() {
                   </div>
 
                   <div className="mb-2">
-                    <label htmlFor="price" className="form-label">
-                      Price (₱)
-                    </label>
+                    <label className="form-label">Price (₱)</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       className="form-control"
-                      id="price"
                       name="price"
                       value={createForm.price}
                       onChange={handleCreateChange}
@@ -435,15 +432,12 @@ export default function Admin() {
                   </div>
 
                   <div className="mb-2">
-                    <label htmlFor="image" className="form-label">
-                      Image
-                    </label>
+                    <label className="form-label">Image</label>
                     <input
                       type="text"
                       className="form-control"
-                      id="image"
                       name="image"
-                      placeholder="/images/products/sample.webp"
+                      placeholder="images/products/sample.webp"
                       value={createForm.image}
                       onChange={handleCreateChange}
                       required
@@ -459,7 +453,7 @@ export default function Admin() {
           )}
 
           {activeTab === "#list" && (
-            <div className="tab-pane fade show active" id="list" role="tabpanel">
+            <div className="tab-pane fade show active">
               <div className="mt-4">
                 {!editingProductId && products.length > 0 && (
                   <>
@@ -486,8 +480,12 @@ export default function Admin() {
                               <td>{product.id}</td>
                               <td>
                                 <img
-                                  src={product.image}
-                                  alt="Product Image"
+                                  src={
+                                    product.image?.startsWith("/")
+                                      ? product.image
+                                      : `/${product.image}`
+                                  }
+                                  alt="Product"
                                   style={{ width: "60px" }}
                                 />
                               </td>
@@ -528,13 +526,10 @@ export default function Admin() {
 
                     <form onSubmit={handleUpdateProduct}>
                       <div className="mb-3">
-                        <label htmlFor="edit_name" className="form-label">
-                          Product Name
-                        </label>
+                        <label className="form-label">Product Name</label>
                         <input
                           type="text"
                           name="name"
-                          id="edit_name"
                           className="form-control"
                           value={editForm.name}
                           onChange={handleEditChange}
@@ -543,12 +538,9 @@ export default function Admin() {
                       </div>
 
                       <div className="mb-3">
-                        <label htmlFor="edit_brand_id" className="form-label">
-                          Brand
-                        </label>
+                        <label className="form-label">Brand</label>
                         <select
                           name="brand_id"
-                          id="edit_brand_id"
                           className="form-select"
                           value={editForm.brand_id}
                           onChange={handleEditChange}
@@ -563,12 +555,9 @@ export default function Admin() {
                       </div>
 
                       <div className="mb-3">
-                        <label htmlFor="edit_description" className="form-label">
-                          Description
-                        </label>
+                        <label className="form-label">Description</label>
                         <textarea
                           name="description"
-                          id="edit_description"
                           className="form-control"
                           rows="3"
                           value={editForm.description}
@@ -577,14 +566,11 @@ export default function Admin() {
                       </div>
 
                       <div className="mb-3">
-                        <label htmlFor="edit_price" className="form-label">
-                          Price (₱)
-                        </label>
+                        <label className="form-label">Price (₱)</label>
                         <input
                           type="number"
                           step="0.01"
                           name="price"
-                          id="edit_price"
                           className="form-control"
                           value={editForm.price}
                           onChange={handleEditChange}
@@ -613,13 +599,10 @@ export default function Admin() {
                       </div>
 
                       <div className="mb-3">
-                        <label htmlFor="edit_image" className="form-label">
-                          Image URL
-                        </label>
+                        <label className="form-label">Image URL</label>
                         <input
                           type="text"
                           name="image"
-                          id="edit_image"
                           className="form-control"
                           value={editForm.image}
                           onChange={handleEditChange}
@@ -650,8 +633,8 @@ export default function Admin() {
           )}
 
           {activeTab === "#report" && (
-            <div className="tab-pane fade show active" id="report" role="tabpanel">
-              <div className="mt-4" style={{ height: "520px" }}>
+            <div className="tab-pane fade show active">
+              <div className="mt-4">
                 <h5 className="text-center mb-3">
                   Best Sellers (by Quantity Sold)
                 </h5>
@@ -660,35 +643,26 @@ export default function Admin() {
                   <table className="table table-bordered align-middle">
                     <thead className="table-dark">
                       <tr>
-                        <th>Month</th>
-                        <th>Nike</th>
-                        <th>Adidas</th>
-                        <th>Jordan</th>
+                        <th>Brand</th>
+                        <th>Total Sold</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {bestSellerData.map((row) => (
-                        <tr key={row.month}>
-                          <td>{row.month}</td>
-                          <td>{row.nike}</td>
-                          <td>{row.adidas}</td>
-                          <td>{row.jordan}</td>
+                      {bestSellerRows.map((row, index) => (
+                        <tr key={index}>
+                          <td>{row.brand_name}</td>
+                          <td>{row.total_sold}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-
-                <p className="text-muted mt-3">
-                  Chart.js from the PHP version should be connected later through
-                  API chart data.
-                </p>
               </div>
             </div>
           )}
 
           {activeTab === "#orders" && (
-            <div className="tab-pane fade show active" id="orders" role="tabpanel">
+            <div className="tab-pane fade show active">
               <div className="mt-4">
                 <h5>Orders</h5>
                 <div className="table-responsive">
@@ -706,8 +680,7 @@ export default function Admin() {
                     <tbody>
                       {orders.length > 0 ? (
                         orders.map((order) => {
-                          const isCanceled =
-                            String(order.status).toLowerCase() === "canceled";
+                          const currentStatus = String(order.status || "").toLowerCase();
 
                           return (
                             <tr key={order.id}>
@@ -720,21 +693,20 @@ export default function Admin() {
                                   <select
                                     className="form-select form-select-sm me-2"
                                     value={order.status}
-                                    disabled={isCanceled}
                                     onChange={(e) =>
                                       handleOrderStatusChange(order.id, e.target.value)
                                     }
                                   >
-                                    <option value="pending">Order Placed</option>
+                                    <option value="Pending">Order Placed</option>
                                     <option value="packed">Packed</option>
                                     <option value="shipped">Shipped</option>
                                     <option value="completed">Delivered</option>
-                                    <option value="canceled">Canceled</option>
+                                    <option value="Canceled">Canceled</option>
                                   </select>
 
-                                  {isCanceled && (
+                                  {currentStatus === "canceled" && (
                                     <span className="badge bg-danger ms-2">
-                                      User Canceled
+                                      Canceled
                                     </span>
                                   )}
                                 </div>
@@ -744,7 +716,7 @@ export default function Admin() {
                         })
                       ) : (
                         <tr>
-                          <td colSpan="6" className="text-center text-muted">
+                          <td colSpan="5" className="text-center text-muted">
                             No orders yet.
                           </td>
                         </tr>
@@ -757,11 +729,7 @@ export default function Admin() {
           )}
 
           {activeTab === "#wishlist-alert" && (
-            <div
-              className="tab-pane fade show active"
-              id="wishlist-alert"
-              role="tabpanel"
-            >
+            <div className="tab-pane fade show active">
               <div className="mt-4">
                 <h5>Out-of-Stock Products in Wishlists</h5>
 
@@ -782,7 +750,11 @@ export default function Admin() {
                           <tr key={item.id}>
                             <td>
                               <img
-                                src={item.image}
+                                src={
+                                  item.image?.startsWith("/")
+                                    ? item.image
+                                    : `/${item.image}`
+                                }
                                 alt={item.name}
                                 style={{ width: "60px" }}
                               />

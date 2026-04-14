@@ -1,4 +1,17 @@
 import { useEffect, useState } from "react";
+import { getImageUrl } from "../utils/image";
+import { Link } from "react-router-dom";
+
+const popularBrands = [
+  { id: 1, name: "Nike" },
+  { id: 2, name: "Adidas" },
+  { id: 3, name: "Jordan" },
+  { id: 4, name: "Under Armour" },
+  { id: 5, name: "Anta" },
+  { id: 6, name: "Converse" },
+  { id: 7, name: "New Balance" },
+  { id: 8, name: "Puma" }
+];
 
 export default function Home() {
   const [showAlert, setShowAlert] = useState(false);
@@ -136,12 +149,12 @@ export default function Home() {
                   <br />
                   walking moment!
                 </h1>
-                <a
-                  href="/shop"
+                <Link
+                  to="/shop"
                   className="btn btn-dark px-4 py-2 rounded-pill fade-text"
                 >
                   BUY NOW
-                </a>
+                </Link>
               </div>
               <div className="text-center">
                 <img
@@ -166,12 +179,9 @@ export default function Home() {
                   <br />
                   walking moment!
                 </h1>
-                <a
-                  href="/shop"
-                  className="btn btn-dark px-4 py-2 rounded-pill fade-text"
-                >
+                <Link to="/shop" className="btn btn-dark px-4 py-2 rounded-pill fade-text">
                   BUY NOW
-                </a>
+                </Link>
               </div>
               <div className="text-center">
                 <img
@@ -216,13 +226,13 @@ export default function Home() {
                 <div className="row g-4 text-center">
                   {chunk.map((brand) => (
                     <div className="col-6 col-md-3" key={brand.id}>
-                      <a
-                        href={`/shop?brand=${brand.id}`}
+                      <Link
+                        to={`/shop?brand=${brand.id}`}
                         className="text-decoration-none text-dark"
                       >
                         <div className="card shadow-sm border-0 h-100 cardo">
                           <img
-                            src={brand.image}
+                            src={getImageUrl(brand.image)}
                             className="card-img-top p-3"
                             style={{ height: "100px", objectFit: "contain" }}
                             alt={brand.name}
@@ -231,7 +241,7 @@ export default function Home() {
                             <h6 className="mb-0">{brand.name}</h6>
                           </div>
                         </div>
-                      </a>
+                      </Link>
                     </div>
                   ))}
                 </div>
@@ -350,7 +360,7 @@ export default function Home() {
               <div className="col-6 col-md-3" key={product.id}>
                 <div className="card h-100 shadow-sm border-0">
                   <img
-                    src={product.image}
+                    src={getImageUrl(product.image)}
                     className="card-img-top"
                     alt="Product Image"
                     style={{ height: "180px", objectFit: "cover" }}
@@ -361,9 +371,9 @@ export default function Home() {
                       ₱ {Number(product.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-truncate mb-3">{product.description}</p>
-                    <a href={`/product?id=${product.id}`} className="btn btn-sm btn-dark mt-auto">
+                    <Link to={`/product?id=${product.id}`} className="btn btn-sm btn-dark mt-auto">
                       View Product
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </div>
